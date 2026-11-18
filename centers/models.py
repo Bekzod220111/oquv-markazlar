@@ -15,7 +15,7 @@ class Center(models.Model):
     name = models.CharField(max_length=200)
     alternative_names = models.TextField(blank=True)
     description = models.TextField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     website = models.URLField(blank=True)
     instagram = models.CharField(max_length=255, blank=True)
