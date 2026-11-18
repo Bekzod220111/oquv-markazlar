@@ -1,0 +1,26 @@
+{% load static %}<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>{% block title %}EduMap — yaqin atrofdagi o'quv markazlar{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="{% static 'js/tailwind-config.js' %}"></script>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body { font-family: "Plus Jakarta Sans", system-ui, sans-serif; overscroll-behavior-y: none;
+           -webkit-tap-highlight-color: transparent; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-surface text-on-surface antialiased">
+  {% block body %}{% endblock %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

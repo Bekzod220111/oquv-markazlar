@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block head %}
+<style>
+  /* Xarita o'lchami oddiy CSS'da: Leaflet ishga tushganda Tailwind CDN hali tayyor bo'lmasligi mumkin */
+  #map-wrap { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0; isolation: isolate; }
+  #map { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+  .leaflet-container { font-family: "Plus Jakarta Sans", sans-serif; background: #e9efe6; }
+
+  /* Marker: sariq "pill" (nom + narx). Tanlanganda qora-oltin. */
+  .mk { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); width: max-content;
+        display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform .15s; }
+  .mk:hover { transform: translate(-50%, -100%) scale(1.06); }
+  .mk-body { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px;
+             background: #ffd43b; color: #231b00; font: 700 12px/16px "Plus Jakarta Sans", sans-serif;
+             border: 1px solid rgba(0,0,0,.08); box-shadow: 0 8px 18px rgba(0,0,0,.12); }
+  .mk-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mk-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(35,27,0,.4); flex-shrink: 0; }
+  .mk-price { font-weight: 800; }
+  .mk-tail { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+             border-top: 7px solid #ffd43b; margin-top: -1px; }
+  .mk.sel { transform: translate(-50%, -100%) scale(1.1); }
+  .mk.sel .mk-body { background: #303031; color: #ffd43b; box-shadow: 0 0 0 2px #ffd43b, 0 12px 24px rgba(0,0,0,.22); }
+  .mk.sel .mk-dot { background: #ffd43b; }
+  .mk.sel .mk-tail { border-top-color: #303031; }
+
+  /* Foydalanuvchi joylashuvi */
+  .me-dot { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+            background: #2563eb; border: 3px solid #fff; animation: me-pulse 2s infinite; }
+  .me-label { position: absolute; left: 0; top: 16px; transform: translateX(-50%); padding: 2px 8px; border-radius: 9999px;
+              background: rgba(255,255,255,.95); font: 700 11px "Plus Jakarta Sans", sans-serif; white-space: nowrap;
+              box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  @keyframes me-pulse { 0% { box-shadow: 0 0 0 0 rgba(37,99,235,.5); } 70% { box-shadow: 0 0 0 14px rgba(37,99,235,0); } 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } }
+
+  .icon-fill { font-variation-settings: 'FILL' 1; }
+  #map [class*="placemark__l"],
+  #map [class*="placemark__r"] { display: none !important; }
+  #map [class*="placemark__content"]:not([class*="inner"]) {
+    position: relative;
+    box-sizing: border-box;
+    display: flex !important;
+    align-items: center;
+    height: 38px !important;
+    padding: 0 12px !important;
+    border: 1px solid rgba(35, 27, 0, .12);
+    border-radius: 9999px !important;
+    background: #ffd43b !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .2);
+    color: #171717 !important;
+  }
+  #map [class*="placemark__content"]:not([class*="inner"])::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -6px;
+    width: 10px;
+    height: 10px;
+    background: #ffd43b;
+    border-right: 1px solid rgba(35, 27, 0, .12);
+    border-bottom: 1px solid rgba(35, 27, 0, .12);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  #map [class*="placemark__content-inner"] {
+    position: relative;
+    z-index: 1;
+    color: #171717 !important;
+    font: 700 12px/16px "Plus Jakarta Sans", sans-serif !important;
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<!-- Yuqori panel -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+  <div class="h-16 px-margin flex items-center justify-between">
+    <div class="flex items-center gap-space-sm">
+      <span class="w-9 h-9 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center">
+        <span class="material-symbols-outlined text-[22px]">school</span>
+      </span>
+      <div class="flex flex-col">
+        <span class="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight leading-none">EduMap</span>
+        <span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide">O'zbekiston</span>
+      </div>
+    </div>
+    <span id="count-pill" class="hidden font-label-md text-label-md text-on-surface bg-surface-container-lowest/90 px-3 py-1.5 rounded-full shadow-sm"></span>
+  </div>
+</header>
+
+<main class="relative w-full pt-16 pb-20 bg-surface">
+  <div class="relative w-full select-none overflow-hidden" style="height: calc(100dvh - 9rem);">
+
+    <!-- Xarita (Leaflet) -->
+    <div id="map-wrap"><div id="map"></div></div>
+
+    <!-- Qidiruv + chiplar -->
+    <div class="absolute top-0 left-0 right-0 z-30 p-margin flex flex-col gap-space-xs pointer-events-none">
+      <div class="w-full relative z-20 pointer-events-auto">
+        <form id="search-form" class="w-full bg-surface-container-lowest/95 backdrop-blur-xl rounded-full shadow-[0_14px_34px_-4px_rgba(0,0,0,0.12)] p-1.5 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 pl-3 flex-1 min-w-0">
+            <span class="material-symbols-outlined text-[20px] text-tertiary">search</span>
+            <input id="search-input" type="text" autocomplete="off" placeholder="Kurs, o'quv markaz yoki tuman..."
+                   class="bg-transparent border-0 outline-none w-full text-on-surface font-headline-sm text-headline-sm font-semibold placeholder:text-on-surface-variant/50 focus:ring-0 p-0"/>
+          </div>
+          <div class="flex items-center gap-1 pr-1">
+            <button id="clear-btn" type="button" title="Tozalash" class="hidden w-8 h-8 rounded-full items-center justify-center hover:bg-surface-container text-tertiary transition-colors">
+              <span class="material-symbols-outlined text-[18px]">close</span>
+            </button>
+            <button type="submit" aria-label="Qidirish" class="w-9 h-9 rounded-full bg-inverse-surface text-primary-container flex items-center justify-center shadow-sm hover:bg-on-surface transition-colors">
+              <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+            </button>
+          </div>
+        </form>
+        <div id="suggest" class="hidden absolute top-[calc(100%+6px)] left-0 right-0 bg-surface-container-lowest rounded-2xl shadow-[0_16px_36px_rgba(0,0,0,0.15)] overflow-hidden py-1"></div>
+      </div>
+      <div id="chips" class="relative z-10 w-full overflow-x-auto no-scrollbar py-1 pointer-events-auto flex items-center gap-2"></div>
+    </div>
+
+    <!-- O'ng tomondagi tugmalar -->
+    <div class="absolute right-margin top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2">
+      <button id="locate-btn" type="button" title="Mening joylashuvim"
+              class="w-11 h-11 rounded-full bg-surface-container-lowest shadow-[0_8px_20px_rgba(0,0,0,0.12)] flex items-center justify-center hover:bg-surface-container transition-all">
+        <span class="material-symbols-outlined text-[22px] text-blue-600">my_location</span>
+      </button>
+      <div class="flex flex-col bg-surface-container-lowest shadow-[0_8px_20px_rgba(0,0,0,0.12)] rounded-full overflow-hidden">
+        <button id="zoom-in" type="button" aria-label="Kattalashtirish" class="w-11 h-10 flex items-center justify-center hover:bg-surface-container transition-colors">
+          <span class="material-symbols-outlined text-[20px]">add</span>
+        </button>
+        <div class="w-6 h-[1px] bg-surface-container self-center"></div>
+        <button id="zoom-out" type="button" aria-label="Kichiklashtirish" class="w-11 h-10 flex items-center justify-center hover:bg-surface-container transition-colors">
+          <span class="material-symbols-outlined text-[20px]">remove</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Pastki navigatsiya -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/85 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.04)]">
+  <div class="h-20 px-space-sm flex items-center justify-around max-w-md mx-auto">
+    <button id="nav-map" type="button" class="min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-space-xs transition-colors group">
+      <div class="w-10 h-8 rounded-full flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-[22px]">map</span></div>
+      <span class="font-label-sm text-label-sm">Xarita</span>
+    </button>
+    <button id="nav-saved" type="button" class="min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-space-xs transition-colors group">
+      <div class="w-10 h-8 rounded-full flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-[22px]">bookmark</span></div>
+      <span class="font-label-sm text-label-sm">Saqlanganlar</span>
+    </button>
+  </div>
+</nav>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ"></script>
+<script src="{% static 'js/map.js' %}"></script>
+{% endblock %}

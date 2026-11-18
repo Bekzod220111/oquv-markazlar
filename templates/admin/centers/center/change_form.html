@@ -1,0 +1,69 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_field_sets %}
+<style>
+  .field-latitude, .field-longitude { display: none; }
+</style>
+<fieldset class="module aligned">
+  <h2>Joylashuvni xaritada tanlash</h2>
+  <div style="padding:12px">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="edumap-address-search" type="text" placeholder="Manzilni qidirish"
+             value="{{ original.address|default:'' }}" style="flex:1;padding:8px">
+      <button type="button" id="edumap-address-button" class="button">Xaritada topish</button>
+    </div>
+    <div id="edumap-admin-map" style="height:420px;width:100%;border:1px solid #ccc"></div>
+  </div>
+</fieldset>
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+<script>
+(function () {
+  var latInput = document.getElementById("id_latitude");
+  var lonInput = document.getElementById("id_longitude");
+  var addressInput = document.getElementById("id_address");
+  var searchInput = document.getElementById("edumap-address-search");
+  var lat = parseFloat(latInput && latInput.value);
+  var lon = parseFloat(lonInput && lonInput.value);
+  var valid = isFinite(lat) && isFinite(lon) && lat !== 0 && lon !== 0;
+  var center = valid ? [lat, lon] : [41.311081, 69.240562];
+
+  if (!window.ymaps) return;
+  ymaps.ready(function () {
+    var map = new ymaps.Map("edumap-admin-map", { center: center, zoom: valid ? 16 : 12, controls: ["zoomControl", "geolocationControl"] });
+    var marker = new ymaps.Placemark(center, {}, { draggable: true, preset: "islands#yellowDotIcon" });
+    map.geoObjects.add(marker);
+
+    function save(coords) {
+      latInput.value = coords[0].toFixed(7);
+      lonInput.value = coords[1].toFixed(7);
+    }
+    marker.events.add("dragend", function () { save(marker.geometry.getCoordinates()); });
+    map.events.add("click", function (e) {
+      marker.geometry.setCoordinates(e.get("coords"));
+      save(e.get("coords"));
+    });
+
+    function geocode(value) {
+      if (!value) return;
+      ymaps.geocode(value, { results: 1 }).then(function (res) {
+        var geoObject = res.geoObjects.get(0);
+        if (!geoObject) return;
+        var coords = geoObject.geometry.getCoordinates();
+        marker.geometry.setCoordinates(coords);
+        map.setCenter(coords, 16);
+        save(coords);
+        addressInput.value = geoObject.getAddressLine();
+        searchInput.value = geoObject.getAddressLine();
+      });
+    }
+
+    document.getElementById("edumap-address-button").addEventListener("click", function () {
+      geocode(searchInput.value);
+    });
+    searchInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); geocode(searchInput.value); }
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block body %}
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+  <div class="h-16 px-margin flex items-center gap-space-sm">
+    <div class="w-9 h-9 rounded-full bg-primary-container text-on-primary-fixed flex items-center justify-center">
+      <span class="material-symbols-outlined text-[22px]">school</span>
+    </div>
+    <div class="flex flex-col">
+      <span class="font-headline-sm text-headline-sm font-bold text-on-surface">EduMap</span>
+      <span class="font-label-sm text-label-sm text-on-surface-variant">O'zbekiston</span>
+    </div>
+  </div>
+</header>
+
+<main class="w-full pt-20 pb-24 px-margin bg-surface">
+  <section class="pt-space-md pb-space-lg text-center">
+    <h1 class="font-headline-lg text-headline-lg sm:text-3xl font-extrabold text-on-surface">
+      Yaqiningizdagi o'quv markazini toping
+    </h1>
+    <p class="font-body-md text-body-md text-on-surface-variant mt-space-sm max-w-md mx-auto">
+      O'quv markazlari, kurs yo'nalishlari va narxlari bo'yicha ma'lumotlarni xaritada ko'ring.
+    </p>
+    <a href="{% url 'map' %}" class="mt-space-lg h-12 px-6 rounded-full bg-primary-container text-on-primary-fixed font-label-lg text-label-lg inline-flex items-center justify-center gap-2 shadow-md">
+      <span class="material-symbols-outlined">explore</span>
+      <span>Xaritadan ko'rish</span>
+    </a>
+  </section>
+
+  <section class="mb-space-lg">
+    <div class="flex items-center justify-between mb-space-sm">
+      <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Yo'nalishlar</h2>
+      <span class="font-label-sm text-label-sm text-on-surface-variant">{{ subjects.count }} ta</span>
+    </div>
+    {% if subjects %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {% for subject in subjects %}
+          <a href="{% url 'map' %}?subject={{ subject.slug }}" class="p-3.5 rounded-2xl bg-surface-container-lowest shadow-sm flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+                <span class="material-symbols-outlined">school</span>
+              </div>
+              <span class="font-headline-sm text-headline-sm font-bold">{{ subject.name }}</span>
+            </div>
+            <span class="material-symbols-outlined text-outline">chevron_right</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="p-4 rounded-2xl bg-surface-container-lowest text-on-surface-variant">Hozircha yo'nalishlar mavjud emas.</p>
+    {% endif %}
+  </section>
+
+  <section class="mb-space-lg">
+    <div class="flex items-center justify-between mb-space-sm">
+      <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">O'quv markazlari</h2>
+      <a href="{% url 'map' %}" class="font-label-sm text-label-sm text-primary font-bold">Xaritada ko'rish</a>
+    </div>
+    {% if centers %}
+      <div class="flex flex-col gap-3">
+        {% for center in centers %}
+          <a href="{% url 'about' center.pk %}" class="p-3.5 rounded-2xl bg-surface-container-lowest shadow-sm flex items-center gap-3">
+            <div class="w-16 h-16 rounded-xl overflow-hidden bg-primary-container/30 shrink-0 flex items-center justify-center">
+              {% if center.image_url %}
+                <img src="{{ center.image_url }}" alt="{{ center.name }}" class="w-full h-full object-cover"/>
+              {% else %}
+                <span class="material-symbols-outlined text-primary">school</span>
+              {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-headline-sm text-headline-sm font-bold truncate">{{ center.name }}</h3>
+              <p class="font-body-sm text-body-sm text-on-surface-variant truncate">{{ center.address }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                {% if center.rating > 0 %}<span class="font-label-sm text-label-sm text-primary">★ {{ center.rating|floatformat:1 }}</span>{% endif %}
+                {% if center.price_monthly %}<span class="font-label-sm text-label-sm">{{ center.price_monthly|stringformat:"s" }} UZS/oy</span>{% endif %}
+              </div>
+            </div>
+            <span class="material-symbols-outlined text-outline">chevron_right</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="p-4 rounded-2xl bg-surface-container-lowest text-on-surface-variant">Hozircha o'quv markazlari qo'shilmagan.</p>
+    {% endif %}
+  </section>
+</main>
+
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.04)]">
+  <div class="h-20 px-space-sm flex items-center justify-around">
+    <a href="{% url 'home' %}" class="min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-space-xs text-on-surface font-bold">
+      <div class="w-10 h-8 rounded-full bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined">explore</span></div>
+      <span class="font-label-sm text-label-sm">Asosiy</span>
+    </a>
+    <a href="{% url 'map' %}" class="min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-space-xs text-on-surface-variant">
+      <div class="w-10 h-8 flex items-center justify-center"><span class="material-symbols-outlined">map</span></div>
+      <span class="font-label-sm text-label-sm">Xarita</span>
+    </a>
+  </div>
+</nav>
+{% endblock %}
