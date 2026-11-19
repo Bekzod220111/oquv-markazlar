@@ -398,6 +398,15 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://api-maps.yandex.ru/2.1/?lang=uz_UZ"></script>
+<style>
+  .edu-pin { position: relative; width: 144px; box-sizing: border-box; padding: 5px 10px; border-radius: 12px;
+             background: #ffd43b; color: #231b00; border: 1px solid rgba(0,0,0,.1); box-shadow: 0 6px 14px rgba(0,0,0,.18);
+             font-family: "Plus Jakarta Sans", sans-serif; text-align: center; }
+  .edu-pin__name { font-weight: 800; font-size: 12px; line-height: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .edu-pin__price { font-weight: 600; font-size: 10.5px; line-height: 14px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .edu-pin__tail { position: absolute; left: 50%; bottom: -6px; margin-left: -6px; width: 0; height: 0;
+                   border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #ffd43b; }
+</style>
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU{% if YANDEX_MAPS_API_KEY %}&amp;apikey={{ YANDEX_MAPS_API_KEY }}{% endif %}"></script>
 <script src="{% static 'js/map.js' %}?v=3"></script>
 {% endblock %}

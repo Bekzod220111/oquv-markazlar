@@ -2,34 +2,165 @@
 
 {% block title %}{{ center.name }} — EduMap{% endblock %}
 
+{% block head %}
+<style>
+  .center-carousel {
+    height: 40vh;
+    height: 40svh;
+    min-height: 15rem;
+    max-height: 34rem;
+  }
+  .center-carousel::before {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 20;
+    height: 100px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent);
+    content: "";
+    pointer-events: none;
+  }
+  .center-topbar-button {
+    border: 0;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow: none;
+  }
+  .center-topbar-button:hover { background: rgba(0, 0, 0, 0.55); }
+  .center-topbar-button:active { background: rgba(0, 0, 0, 0.65); }
+  .center-topbar-title { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+  #center-favorite .material-symbols-outlined { font-variation-settings: 'FILL' 0; }
+  #center-favorite[aria-pressed="true"] .material-symbols-outlined {
+    color: #ff3b5c;
+    font-variation-settings: 'FILL' 1;
+  }
+  .center-carousel-track,
+  .center-lightbox-track {
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    touch-action: pan-y;
+  }
+  .center-carousel-track::-webkit-scrollbar,
+  .center-lightbox-track::-webkit-scrollbar,
+  .center-photo-thumbnails::-webkit-scrollbar {
+    display: none;
+  }
+  .center-carousel-track { cursor: grab; }
+  .center-carousel-track.is-dragging { cursor: grabbing; }
+  .center-carousel-slide,
+  .center-lightbox-slide {
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  .center-gallery-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.72);
+    transition: width 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+  .center-gallery-dot[aria-current="true"] {
+    width: 1.125rem;
+    background: #ffd43b;
+  }
+  #center-photo-dialog {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: white;
+    background: #000;
+    overscroll-behavior: contain;
+  }
+  #center-photo-dialog::backdrop { background: #000; }
+  #center-photo-dialog[open] { animation: center-lightbox-open 180ms ease-out; }
+  @keyframes center-lightbox-open {
+    from { opacity: 0; transform: scale(0.985); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .center-lightbox-thumb {
+    flex: 0 0 auto;
+    width: 3.75rem;
+    height: 3.75rem;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 0.375rem;
+    opacity: 0.55;
+    transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
+  }
+  .center-lightbox-thumb[aria-current="true"] {
+    transform: scale(1.08);
+    border-color: white;
+    opacity: 1;
+  }
+  @media (min-width: 768px) {
+    .center-carousel { height: min(52vh, 42rem); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #center-photo-dialog[open] { animation: none; }
+    .center-gallery-dot,
+    .center-lightbox-thumb { transition: none; }
+    .center-carousel-track,
+    .center-lightbox-track { scroll-behavior: auto !important; }
+  }
+</style>
+{% endblock %}
+
 {% block body %}
-<header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+<header class="absolute top-0 w-full z-50 pt-safe">
   <div class="h-16 px-margin flex items-center gap-2">
-    <button type="button" onclick="history.back()" class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-surface-container">
+    <button type="button" onclick="history.back()" aria-label="Orqaga" class="center-topbar-button w-11 h-11 flex shrink-0 items-center justify-center rounded-full">
       <span class="material-symbols-outlined">arrow_back</span>
     </button>
-    <span class="font-headline-sm text-headline-sm font-bold truncate">Markaz tafsilotlari</span>
+    <span class="center-topbar-title min-w-0 flex-1 font-headline-sm text-headline-sm font-bold text-white truncate">Markaz tafsilotlari</span>
+    <button type="button" id="center-favorite" aria-label="Sevimlilarga qo'shish" aria-pressed="false" class="center-topbar-button ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+      <span class="material-symbols-outlined">favorite_border</span>
+    </button>
   </div>
 </header>
 
-<main class="pt-16 pb-10 bg-surface min-h-screen">
-  {% if center.image_url %}
-    <div class="w-full h-72 overflow-hidden bg-surface-container">
-      <img src="{{ center.image_url }}" alt="{{ center.name }}" class="w-full h-full object-cover"/>
-    </div>
-  {% elif center.images.all %}
-    <div class="w-full h-72 overflow-hidden bg-surface-container">
-      {% for image in center.images.all|slice:":1" %}
-        <img src="{{ image.image.url }}" alt="{{ image.alt|default:center.name }}" class="w-full h-full object-cover"/>
-      {% endfor %}
-    </div>
+<main class="pb-10 bg-surface min-h-screen">
+  {% if center.image_url or center.images.all %}
+    <section class="center-carousel relative mx-auto w-full max-w-[80rem] overflow-hidden bg-black" aria-label="Markaz rasmlari">
+      <div id="center-photo-gallery" class="center-carousel-track h-full" role="region" aria-label="Rasmlar karuseli" tabindex="0">
+        {% if center.image_url %}
+          <button type="button" class="center-carousel-slide center-photo-slide relative h-full snap-center bg-black" data-photo-src="{{ center.image_url }}" data-photo-alt="{{ center.name }}" aria-label="Rasmni to'liq ko'rish: {{ center.name }}">
+            <img src="{{ center.image_url }}" alt="{{ center.name }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high" draggable="false"/>
+          </button>
+        {% endif %}
+        {% for image in center.images.all %}
+          <button type="button" class="center-carousel-slide center-photo-slide relative h-full snap-center bg-black" data-photo-src="{{ image.image.url }}" data-photo-alt="{{ image.alt|default:center.name }}" aria-label="Rasmni to'liq ko'rish: {{ image.alt|default:center.name }}">
+            {% if forloop.first and not center.image_url %}
+              <img src="{{ image.image.url }}" alt="{{ image.alt|default:center.name }}" class="h-full w-full object-cover" loading="eager" fetchpriority="high" draggable="false"/>
+            {% else %}
+              <img src="{{ image.image.url }}" alt="{{ image.alt|default:center.name }}" class="h-full w-full object-cover" loading="lazy" draggable="false"/>
+            {% endif %}
+          </button>
+        {% endfor %}
+      </div>
+      <div id="center-inline-dots" class="absolute inset-x-0 bottom-10 z-10 flex items-center justify-center gap-2" role="group" aria-label="Rasm tanlash"></div>
+      <button type="button" id="center-inline-previous" class="absolute left-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:flex" aria-label="Oldingi rasm">
+        <span class="material-symbols-outlined">chevron_left</span>
+      </button>
+      <button type="button" id="center-inline-next" class="absolute right-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:flex" aria-label="Keyingi rasm">
+        <span class="material-symbols-outlined">chevron_right</span>
+      </button>
+    </section>
   {% else %}
-    <div class="w-full h-72 bg-primary-container/30 flex items-center justify-center">
+    <div class="center-carousel mx-auto flex w-full max-w-[80rem] items-center justify-center bg-primary-container/30">
       <span class="material-symbols-outlined text-[64px] text-primary">school</span>
     </div>
   {% endif %}
 
-  <div class="-mt-8 relative z-10 bg-surface rounded-t-[2.5rem] px-margin pt-6 pb-safe">
+  <div id="center-details" class="-mt-8 relative z-10 bg-surface rounded-t-[2.5rem] px-margin pt-6 pb-safe">
     <h1 class="font-headline-lg text-headline-lg font-bold text-on-surface">{{ center.name }}</h1>
     {% if center.rating > 0 %}
       <div class="mt-2 inline-flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-lg">
@@ -55,17 +186,6 @@
       <section class="mt-5">
         <h2 class="font-headline-sm text-headline-sm font-bold">Markaz haqida</h2>
         <p class="mt-2 font-body-md text-body-md text-on-surface-variant leading-relaxed">{{ center.description }}</p>
-      </section>
-    {% endif %}
-
-    {% if center.images.all|length > 1 %}
-      <section class="mt-5">
-        <h2 class="font-headline-sm text-headline-sm font-bold">Fotolar</h2>
-        <div class="mt-2 flex gap-3 overflow-x-auto no-scrollbar">
-          {% for image in center.images.all %}
-            <img src="{{ image.image.url }}" alt="{{ image.alt|default:center.name }}" class="w-64 h-44 object-cover rounded-2xl shrink-0"/>
-          {% endfor %}
-        </div>
       </section>
     {% endif %}
 
@@ -149,4 +269,338 @@
     </div>
   </div>
 </main>
+
+{% if center.image_url or center.images.all %}
+  <dialog id="center-photo-dialog" role="dialog" aria-modal="true" aria-label="Markaz rasmlarini ko'rish">
+    <div class="flex h-full flex-col overflow-hidden bg-black">
+      <header class="relative z-10 flex h-14 shrink-0 items-center justify-between px-4 pt-safe">
+        <button type="button" id="center-photo-close" class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white" aria-label="Yopish">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+        <span id="center-photo-count" class="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-white" aria-live="polite"></span>
+        <span class="h-10 w-10" aria-hidden="true"></span>
+      </header>
+      <div class="relative flex min-h-0 flex-1 flex-col">
+        <div id="center-lightbox-viewer" class="center-lightbox-track min-h-0 flex-1" role="region" aria-label="Rasmlarni ko'rish uchun suring" tabindex="0"></div>
+        <button type="button" id="center-lightbox-previous" class="absolute left-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 md:flex" aria-label="Oldingi rasm">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button type="button" id="center-lightbox-next" class="absolute right-4 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 md:flex" aria-label="Keyingi rasm">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+      <footer class="shrink-0 pb-safe pt-3">
+        <div id="center-lightbox-dots" class="flex items-center justify-center gap-2 pb-3" role="group" aria-label="Rasm tanlash"></div>
+        <div id="center-photo-thumbnails" class="center-photo-thumbnails flex h-16 items-center gap-2 overflow-x-auto overscroll-x-contain px-4 pb-2" role="group" aria-label="Rasm kichik ko'rinishlari"></div>
+      </footer>
+    </div>
+  </dialog>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    const inlineTrack = document.getElementById("center-photo-gallery");
+    const photoSlides = inlineTrack ? Array.from(inlineTrack.querySelectorAll(".center-photo-slide")) : [];
+    const inlineDots = document.getElementById("center-inline-dots");
+    const inlinePrevious = document.getElementById("center-inline-previous");
+    const inlineNext = document.getElementById("center-inline-next");
+    const dialog = document.getElementById("center-photo-dialog");
+    const viewer = document.getElementById("center-lightbox-viewer");
+    const viewerDots = document.getElementById("center-lightbox-dots");
+    const thumbnailStrip = document.getElementById("center-photo-thumbnails");
+    const counter = document.getElementById("center-photo-count");
+    const closeButton = document.getElementById("center-photo-close");
+    const viewerPrevious = document.getElementById("center-lightbox-previous");
+    const viewerNext = document.getElementById("center-lightbox-next");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scrollBehavior = reduceMotion ? "auto" : "smooth";
+    const viewerImages = [];
+    const thumbnails = [];
+    const dotGroups = [];
+    const preloadedSources = new Set();
+    let currentIndex = 0;
+    let isLightboxOpen = false;
+    let returnFocusTarget = null;
+    let previousBodyOverflow = "";
+    let swipeStart = null;
+
+    function clampIndex(index) {
+      return Math.max(0, Math.min(photoSlides.length - 1, index));
+    }
+
+    function scrollTrackTo(track, index, behavior) {
+      if (track && track.clientWidth) {
+        track.scrollTo({ left: index * track.clientWidth, behavior });
+      }
+    }
+
+    function preloadNeighbors(index) {
+      [index - 1, index + 1].forEach((neighbor) => {
+        if (neighbor < 0 || neighbor >= photoSlides.length) return;
+        const source = photoSlides[neighbor].dataset.photoSrc;
+        if (preloadedSources.has(source)) return;
+        preloadedSources.add(source);
+        const image = new Image();
+        image.src = source;
+      });
+    }
+
+    function updateIndicators(behavior) {
+      if (counter) counter.textContent = `${currentIndex + 1} / ${photoSlides.length}`;
+      dotGroups.forEach((dots) => {
+        dots.forEach((dot, index) => {
+          const active = index === currentIndex;
+          dot.setAttribute("aria-current", active ? "true" : "false");
+          dot.setAttribute("aria-label", `Rasm ${index + 1} / ${photoSlides.length}`);
+        });
+      });
+      thumbnails.forEach((thumbnail, index) => {
+        thumbnail.setAttribute("aria-current", index === currentIndex ? "true" : "false");
+      });
+      if (isLightboxOpen && thumbnails[currentIndex]) {
+        thumbnails[currentIndex].scrollIntoView({ behavior, block: "nearest", inline: "center" });
+      }
+      if (inlinePrevious) inlinePrevious.disabled = currentIndex === 0;
+      if (inlineNext) inlineNext.disabled = currentIndex === photoSlides.length - 1;
+      if (viewerPrevious) viewerPrevious.disabled = currentIndex === 0;
+      if (viewerNext) viewerNext.disabled = currentIndex === photoSlides.length - 1;
+    }
+
+    function setCurrentIndex(index, sourceTrack, behavior = scrollBehavior) {
+      if (!photoSlides.length) return;
+      currentIndex = clampIndex(index);
+      if (sourceTrack !== inlineTrack) scrollTrackTo(inlineTrack, currentIndex, behavior);
+      if (isLightboxOpen && sourceTrack !== viewer) scrollTrackTo(viewer, currentIndex, behavior);
+      updateIndicators(behavior);
+      preloadNeighbors(currentIndex);
+    }
+
+    function createDotGroup(container) {
+      if (!container) return [];
+      const dots = photoSlides.map((_, index) => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "center-gallery-dot";
+        dot.setAttribute("aria-label", `Rasm ${index + 1} / ${photoSlides.length}`);
+        dot.setAttribute("aria-current", index === 0 ? "true" : "false");
+        dot.addEventListener("click", () => setCurrentIndex(index, null), { signal });
+        container.append(dot);
+        return dot;
+      });
+      dotGroups.push(dots);
+      return dots;
+    }
+
+    function buildLightboxSlides() {
+      if (!viewer || !thumbnailStrip) return;
+      photoSlides.forEach((photo, index) => {
+        const slide = document.createElement("div");
+        slide.className = "center-lightbox-slide flex h-full items-center justify-center";
+        slide.setAttribute("aria-label", `Rasm ${index + 1} / ${photoSlides.length}`);
+        const image = document.createElement("img");
+        image.src = photo.dataset.photoSrc;
+        image.alt = photo.dataset.photoAlt;
+        image.loading = index === 0 ? "eager" : "lazy";
+        image.decoding = "async";
+        image.draggable = false;
+        image.className = "max-h-full max-w-full object-contain";
+        slide.append(image);
+        viewer.append(slide);
+        viewerImages.push(image);
+
+        const thumbnail = document.createElement("button");
+        thumbnail.type = "button";
+        thumbnail.className = "center-lightbox-thumb";
+        thumbnail.setAttribute("aria-label", `Rasm ${index + 1} / ${photoSlides.length}: ${photo.dataset.photoAlt}`);
+        thumbnail.setAttribute("aria-current", index === 0 ? "true" : "false");
+        const thumbnailImage = document.createElement("img");
+        thumbnailImage.src = photo.dataset.photoSrc;
+        thumbnailImage.alt = "";
+        thumbnailImage.loading = "lazy";
+        thumbnailImage.className = "h-full w-full object-cover";
+        thumbnail.append(thumbnailImage);
+        thumbnail.addEventListener("click", () => setCurrentIndex(index, null), { signal });
+        thumbnailStrip.append(thumbnail);
+        thumbnails.push(thumbnail);
+      });
+    }
+
+    function openLightbox(index, trigger) {
+      if (!dialog || isLightboxOpen) return;
+      returnFocusTarget = trigger;
+      isLightboxOpen = true;
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      dialog.showModal();
+      if (viewerImages[index]) viewerImages[index].loading = "eager";
+      setCurrentIndex(index, null, "auto");
+      closeButton.focus();
+    }
+
+    function closeLightbox() {
+      if (dialog && isLightboxOpen) dialog.close();
+    }
+
+    function handleTrackScroll(track) {
+      if (!track || !track.clientWidth) return;
+      const index = Math.round(track.scrollLeft / track.clientWidth);
+      if (index !== currentIndex) setCurrentIndex(index, track, "auto");
+    }
+
+    function enableMouseDrag(track) {
+      if (!track) return;
+      let pointer = null;
+      let suppressClickUntil = 0;
+
+      track.addEventListener("pointerdown", (event) => {
+        if (!event.target.closest(".center-photo-slide, .center-lightbox-slide")) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        pointer = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          scrollLeft: track.scrollLeft,
+          moved: false,
+        };
+      }, { signal });
+
+      track.addEventListener("pointermove", (event) => {
+        if (!pointer || event.pointerId !== pointer.id) return;
+        const deltaX = event.clientX - pointer.x;
+        const deltaY = event.clientY - pointer.y;
+        if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
+        if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
+        pointer.moved = true;
+        if (!track.hasPointerCapture(event.pointerId)) track.setPointerCapture(event.pointerId);
+        track.classList.add("is-dragging");
+        track.scrollLeft = pointer.scrollLeft - deltaX;
+        event.preventDefault();
+      }, { signal });
+
+      const finishPointer = (event) => {
+        if (!pointer || event.pointerId !== pointer.id) return;
+        const dragged = pointer.moved;
+        pointer = null;
+        track.classList.remove("is-dragging");
+        if (dragged) {
+          suppressClickUntil = Date.now() + 400;
+          const index = Math.round(track.scrollLeft / track.clientWidth);
+          setCurrentIndex(index, track);
+        }
+      };
+
+      track.addEventListener("pointerup", finishPointer, { signal });
+      track.addEventListener("pointercancel", finishPointer, { signal });
+      track.addEventListener("click", (event) => {
+        if (Date.now() < suppressClickUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, { capture: true, signal });
+    }
+
+    function goToNext(direction) {
+      setCurrentIndex(currentIndex + direction, null);
+    }
+
+    createDotGroup(inlineDots);
+    createDotGroup(viewerDots);
+    buildLightboxSlides();
+    enableMouseDrag(inlineTrack);
+    enableMouseDrag(viewer);
+
+    if (inlineTrack) {
+      inlineTrack.addEventListener("scroll", () => handleTrackScroll(inlineTrack), { passive: true, signal });
+      inlineTrack.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          goToNext(event.key === "ArrowLeft" ? -1 : 1);
+        }
+      }, { signal });
+    }
+    if (viewer) {
+      viewer.addEventListener("scroll", () => handleTrackScroll(viewer), { passive: true, signal });
+      viewer.addEventListener("touchstart", (event) => {
+        if (event.touches.length === 1) {
+          swipeStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        }
+      }, { passive: true, signal });
+      viewer.addEventListener("touchend", (event) => {
+        if (!swipeStart || !event.changedTouches.length) return;
+        const deltaY = event.changedTouches[0].clientY - swipeStart.y;
+        const deltaX = event.changedTouches[0].clientX - swipeStart.x;
+        swipeStart = null;
+        if (deltaY > 120 && Math.abs(deltaY) > Math.abs(deltaX) && isLightboxOpen) closeLightbox();
+      }, { passive: true, signal });
+      viewer.addEventListener("touchcancel", () => { swipeStart = null; }, { passive: true, signal });
+    }
+
+    photoSlides.forEach((slide, index) => {
+      slide.addEventListener("click", () => openLightbox(index, slide), { signal });
+    });
+
+    [inlinePrevious, viewerPrevious].forEach((button) => {
+      if (button) button.addEventListener("click", () => goToNext(-1), { signal });
+    });
+    [inlineNext, viewerNext].forEach((button) => {
+      if (button) button.addEventListener("click", () => goToNext(1), { signal });
+    });
+
+    if (dialog) {
+      closeButton.addEventListener("click", closeLightbox, { signal });
+      dialog.addEventListener("close", () => {
+        isLightboxOpen = false;
+        document.body.style.overflow = previousBodyOverflow;
+        setCurrentIndex(currentIndex, null, "auto");
+        if (returnFocusTarget) returnFocusTarget.focus({ preventScroll: true });
+        returnFocusTarget = null;
+      }, { signal });
+      dialog.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          goToNext(event.key === "ArrowLeft" ? -1 : 1);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeLightbox();
+          return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(dialog.querySelectorAll("button:not([disabled]), [tabindex]:not([tabindex='-1'])"))
+          .filter((element) => element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }, { signal });
+    }
+
+    const favoriteButton = document.getElementById("center-favorite");
+    favoriteButton.addEventListener("click", () => {
+      const active = favoriteButton.getAttribute("aria-pressed") !== "true";
+      favoriteButton.setAttribute("aria-pressed", String(active));
+      favoriteButton.setAttribute("aria-label", active ? "Sevimlilardan olib tashlash" : "Sevimlilarga qo'shish");
+      favoriteButton.querySelector(".material-symbols-outlined").textContent = active ? "favorite" : "favorite_border";
+    }, { signal });
+
+    window.addEventListener("resize", () => {
+      scrollTrackTo(inlineTrack, currentIndex, "auto");
+      if (isLightboxOpen) scrollTrackTo(viewer, currentIndex, "auto");
+    }, { signal });
+    window.addEventListener("pagehide", () => controller.abort(), { once: true, signal });
+    updateIndicators("auto");
+    preloadNeighbors(currentIndex);
+  })();
+</script>
 {% endblock %}

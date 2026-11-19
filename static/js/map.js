@@ -4,8 +4,13 @@
   var TASHKENT = [41.38, 69.29];
   var markers = {};
   var searchQuery = "";
+  var subjectSlug = new URLSearchParams(window.location.search).get("subject") || "";
   var loadTimer = null;
   var map;
+  var meMarker = null;
+  var courseId = "";
+  var suggestTimer = null;
+  var suggestToken = 0;
   var centerSheet;
   var centerSheetPanel;
   var centerSheetTitle;
@@ -220,25 +225,31 @@
     markers = {};
   }
 
+  var PinLayout = null;
+  var activeRequest = 0;
+
   function renderMarkers(list) {
     clearMarkers();
+    if (!PinLayout) {
+      PinLayout = ymaps.templateLayoutFactory.createClass(
+        '<div class="edu-pin"><div class="edu-pin__name">{{ properties.name }}</div>' +
+        '<div class="edu-pin__price">{{ properties.price }}</div><span class="edu-pin__tail"></span></div>'
+      );
+    }
     list.forEach(function (center) {
       if (!isFinite(center.latitude) || !isFinite(center.longitude)) return;
       var marker = new ymaps.Placemark(
         [center.latitude, center.longitude],
+        { hintContent: center.name, name: center.name, price: priceText(center) },
         {
-          hintContent: center.name,
-          iconContent: esc(center.name + " · " + priceText(center))
-        },
-        {
-          preset: "islands#yellowStretchyIcon",
+          iconLayout: PinLayout,
+          iconOffset: [-72, -46],
+          iconShape: { type: "Rectangle", coordinates: [[0, 0], [144, 46]] },
           cursor: "pointer",
           openBalloonOnClick: false
         }
       );
-      function openCenter() {
-        openCenterSheet(center);
-      }
+      function openCenter() { showCenter(center); }
       marker.events.add("click", openCenter);
       marker.events.add("tap", openCenter);
       map.geoObjects.add(marker);
@@ -246,11 +257,23 @@
     });
   }
 
+  // Marker bosilganda: avval ro'yxatdagi ma'lumot, so'ng to'liq ma'lumot (/api/centers/<id>/)
+  async function showCenter(center) {
+    var token = ++activeRequest;
+    openCenterSheet(center);
+    try {
+      var full = await api("centers/" + encodeURIComponent(center.id), {});
+      if (token === activeRequest) renderCenterSheet(full);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   async function loadVisibleCenters() {
     var bounds = visibleBounds();
     if (!bounds) return;
     try {
-      var params = Object.assign({}, bounds, searchQuery ? { q: searchQuery } : {});
+      var params = Object.assign({}, bounds, searchQuery ? { q: searchQuery } : {}, subjectSlug ? { subject: subjectSlug } : {}, courseId ? { course: courseId } : {});
       var list = await api("centers", params);
       renderMarkers(list);
       document.getElementById("count-pill").textContent = list.length + " ta markaz";
@@ -258,6 +281,94 @@
     } catch (error) {
       console.error(error);
     }
+  }
+
+  // Tanlangan kurs/qidiruv bo'yicha BARCHA mos markazlarni olib, xaritani ularga moslaydi
+  async function applyFilter() {
+    try {
+      var params = Object.assign({}, searchQuery ? { q: searchQuery } : {}, subjectSlug ? { subject: subjectSlug } : {}, courseId ? { course: courseId } : {});
+      var list = await api("centers", params);
+      renderMarkers(list);
+      var pill = document.getElementById("count-pill");
+      pill.textContent = list.length + " ta markaz";
+      pill.classList.remove("hidden");
+      if (!list.length) return;
+      if (list.length === 1) {
+        map.setCenter([list[0].latitude, list[0].longitude], 15);
+      } else {
+        var lats = list.map(function (c) { return c.latitude; });
+        var lons = list.map(function (c) { return c.longitude; });
+        map.setBounds([[Math.min.apply(null, lats), Math.min.apply(null, lons)], [Math.max.apply(null, lats), Math.max.apply(null, lons)]],
+          { checkZoomRange: true, zoomMargin: [140, 60, 100, 60] });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function hideSuggest() {
+    var box = document.getElementById("suggest");
+    box.classList.add("hidden");
+    box.innerHTML = "";
+  }
+
+  function suggestRow(attrs, icon, title, sub, extra) {
+    return '<button type="button" class="suggest-row w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface-container" ' + attrs + '>' +
+      '<span class="material-symbols-outlined text-[20px] text-tertiary">' + icon + '</span>' +
+      '<span class="min-w-0 flex-1"><span class="block font-semibold text-on-surface truncate">' + esc(title) + '</span>' +
+      '<span class="block text-xs text-on-surface-variant truncate">' + esc(sub) + '</span></span>' +
+      (extra ? '<span class="text-xs font-bold text-on-surface">' + esc(extra) + '</span>' : "") + '</button>';
+  }
+
+  function renderSuggest(data) {
+    var box = document.getElementById("suggest");
+    var html = "";
+    (data.courses || []).forEach(function (c) {
+      html += suggestRow('data-kind="course" data-id="' + esc(c.id) + '" data-name="' + esc(c.name) + '"', "school", c.name, c.center_count + " ta markaz");
+    });
+    (data.subjects || []).forEach(function (s) {
+      html += suggestRow('data-kind="subject" data-slug="' + esc(s.slug) + '" data-name="' + esc(s.name) + '"', "category", s.name, "Yo'nalish · " + s.center_count + " ta markaz");
+    });
+    (data.centers || []).forEach(function (c) {
+      html += suggestRow('data-kind="center" data-id="' + esc(c.id) + '" data-name="' + esc(c.name) + '"', "location_on", c.name, c.address, Number(c.rating) > 0 ? "★ " + Number(c.rating).toFixed(1) : "");
+    });
+    if (!html) html = '<div class="px-4 py-3 text-sm text-on-surface-variant">Hech narsa topilmadi</div>';
+    box.innerHTML = html;
+    box.classList.remove("hidden");
+  }
+
+  async function fetchSuggest(q) {
+    var token = ++suggestToken;
+    try {
+      var data = await api("suggest", { q: q });
+      if (token === suggestToken) renderSuggest(data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function chooseSuggest(row, input) {
+    var kind = row.getAttribute("data-kind");
+    var name = row.getAttribute("data-name");
+    input.value = name;
+    document.getElementById("clear-btn").classList.remove("hidden");
+    document.getElementById("clear-btn").classList.add("flex");
+    hideSuggest();
+    courseId = "";
+    subjectSlug = "";
+    searchQuery = "";
+    if (kind === "course") {
+      courseId = row.getAttribute("data-id");
+    } else if (kind === "subject") {
+      subjectSlug = row.getAttribute("data-slug");
+    } else {
+      searchQuery = name;
+    }
+    applyFilter().then(function () {
+      if (kind === "center") {
+        showCenter({ id: Number(row.getAttribute("data-id")), name: name });
+      }
+    });
   }
 
   function scheduleLoad() {
@@ -281,12 +392,14 @@
         navigator.geolocation.getCurrentPosition(function (pos) {
           var coords = [pos.coords.latitude, pos.coords.longitude];
           map.setCenter(coords, 14);
-          var marker = new ymaps.Placemark(coords, {}, {
-            preset: "islands#blueCircleDotIcon",
-            iconShape: null
+          if (meMarker) map.geoObjects.remove(meMarker);
+          meMarker = new ymaps.Placemark(coords, { hintContent: "Siz shu yerdasiz" }, {
+            preset: "islands#blueCircleDotIcon"
           });
-          map.geoObjects.add(marker);
-        });
+          map.geoObjects.add(meMarker);
+        }, function () {
+          alert("Joylashuvga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.");
+        }, { enableHighAccuracy: true, timeout: 10000 });
       });
 
       document.getElementById("zoom-in").addEventListener("click", function () { map.setZoom(map.getZoom() + 1); });
@@ -294,14 +407,43 @@
 
       var form = document.getElementById("search-form");
       var input = document.getElementById("search-input");
+      var clearBtn = document.getElementById("clear-btn");
+      var suggestBox = document.getElementById("suggest");
+
+      input.addEventListener("input", function () {
+        var v = input.value.trim();
+        clearBtn.classList.toggle("hidden", !v);
+        clearBtn.classList.toggle("flex", !!v);
+        clearTimeout(suggestTimer);
+        if (!v) { hideSuggest(); return; }
+        suggestTimer = setTimeout(function () { fetchSuggest(v); }, 200);
+      });
+      input.addEventListener("focus", function () {
+        if (input.value.trim() && !suggestBox.innerHTML) fetchSuggest(input.value.trim());
+      });
+      suggestBox.addEventListener("click", function (event) {
+        var row = event.target.closest(".suggest-row");
+        if (row) chooseSuggest(row, input);
+      });
+      document.addEventListener("click", function (event) {
+        if (!event.target.closest("#search-form") && !event.target.closest("#suggest")) hideSuggest();
+      });
       form.addEventListener("submit", function (event) {
         event.preventDefault();
         searchQuery = input.value.trim();
-        loadVisibleCenters();
+        courseId = "";
+        subjectSlug = "";
+        hideSuggest();
+        applyFilter();
       });
-      document.getElementById("clear-btn").addEventListener("click", function () {
+      clearBtn.addEventListener("click", function () {
         input.value = "";
         searchQuery = "";
+        courseId = "";
+        subjectSlug = "";
+        clearBtn.classList.add("hidden");
+        clearBtn.classList.remove("flex");
+        hideSuggest();
         loadVisibleCenters();
       });
 

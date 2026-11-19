@@ -15,7 +15,7 @@
     <div id="edumap-admin-map" style="height:420px;width:100%;border:1px solid #ccc"></div>
   </div>
 </fieldset>
-<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU{% if YANDEX_MAPS_API_KEY %}&amp;apikey={{ YANDEX_MAPS_API_KEY }}{% endif %}"></script>
 <script>
 (function () {
   var latInput = document.getElementById("id_latitude");
