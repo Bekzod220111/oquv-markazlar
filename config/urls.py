@@ -6,7 +6,7 @@ from django.conf.urls.static import static
 from centers.views import AboutView, HomeView, MapView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("api/", include("centers.urls")),
     path("about/<int:pk>/", AboutView.as_view(), name="about"),
     path("map/", MapView.as_view(), name="map"),
